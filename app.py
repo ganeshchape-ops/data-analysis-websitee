@@ -269,27 +269,50 @@ def api_analysis():
 import streamlit as st
 import pandas as pd
 
+# -----------------------------
+# Page Settings
+# -----------------------------
 st.set_page_config(
     page_title="Data Analysis Website",
     page_icon="📊",
     layout="wide"
 )
 
+# -----------------------------
+# Title
+# -----------------------------
 st.title("📊 Data Analysis Website")
+st.write("Upload your student CSV file to analyze the data.")
 
+# -----------------------------
+# Upload CSV
+# -----------------------------
 uploaded_file = st.file_uploader(
-    "Upload CSV File",
+    "📁 Upload CSV File",
     type=["csv"]
 )
 
+# -----------------------------
+# Main Program
+# -----------------------------
 if uploaded_file is not None:
 
+    # Read CSV
     df = pd.read_csv(uploaded_file)
 
+    # -----------------------------
+    # Dataset
+    # -----------------------------
     st.subheader("📋 Dataset")
-    st.dataframe(df, use_container_width=True)
 
-    # Marks columns
+    st.dataframe(
+        df,
+        use_container_width=True
+    )
+
+    # -----------------------------
+    # Subject Columns
+    # -----------------------------
     subjects = [
         "Mathematics",
         "Science",
@@ -299,106 +322,189 @@ if uploaded_file is not None:
         "Computer"
     ]
 
-    # Check columns
-    available_subjects = [
-        col for col in subjects if col in df.columns
+    subject_cols = [
+        col for col in subjects
+        if col in df.columns
     ]
 
-    # Total and Average
-    df["Total"] = df[available_subjects].sum(axis=1)
-    df["Average"] = df[available_subjects].mean(axis=1)
+    # -----------------------------
+    # Check Subject Columns
+    # -----------------------------
+    if len(subject_cols) == 0:
 
-    st.subheader("📊 Student Performance")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            "👨‍🎓 Total Students",
-            len(df)
+        st.error(
+            "❌ No subject columns found in the CSV file."
         )
 
-    with col2:
-        st.metric(
-            "📈 Overall Average",
-            round(df["Average"].mean(), 2)
+    else:
+
+        # -----------------------------
+        # Total & Average
+        # -----------------------------
+        df["Total"] = df[subject_cols].sum(axis=1)
+
+        df["Average"] = df[subject_cols].mean(axis=1)
+
+        # -----------------------------
+        # Student Performance
+        # -----------------------------
+        st.subheader("📊 Student Performance")
+
+        col1, col2, col3 = st.columns(3)
+
+        # Total Students
+        with col1:
+            st.metric(
+                "👨‍🎓 Total Students",
+                len(df)
+            )
+
+        # Overall Average
+        with col2:
+            overall_average = df["Average"].mean()
+
+            st.metric(
+                "📈 Overall Average",
+                round(overall_average, 2)
+            )
+
+        # Top Student
+        with col3:
+
+            if "Student Name" in df.columns:
+
+                top_index = df["Total"].idxmax()
+
+                top_student = df.loc[
+                    top_index,
+                    "Student Name"
+                ]
+
+                st.metric(
+                    "🏆 Top Student",
+                    top_student
+                )
+
+        # -----------------------------
+        # Subject-wise Average
+        # -----------------------------
+        st.subheader("📈 Subject-wise Average")
+
+        subject_average = df[subject_cols].mean()
+
+        st.bar_chart(
+            subject_average
         )
 
-    with col3:
-        top_student = df.loc[
-            df["Total"].idxmax(),
-            "Student Name"
-        ]
+        # -----------------------------
+        # Top 5 Students
+        # -----------------------------
+        st.subheader("🏆 Top 5 Students")
 
-        st.metric(
-            "🏆 Top Student",
-            top_student
+        if "Student Name" in df.columns:
+
+            top5 = df.sort_values(
+                "Total",
+                ascending=False
+            ).head(5)
+
+            st.dataframe(
+                top5[
+                    [
+                        "Student Name",
+                        "Total",
+                        "Average"
+                    ]
+                ],
+                use_container_width=True
+            )
+
+        # -----------------------------
+        # Section-wise Analysis
+        # -----------------------------
+        if "Section" in df.columns:
+
+            st.subheader("📚 Section-wise Analysis")
+
+            section_average = (
+                df.groupby("Section")[subject_cols]
+                .mean()
+            )
+
+            section_average = section_average.mean(
+                axis=1
+            )
+
+            st.bar_chart(
+                section_average
+            )
+
+        # -----------------------------
+        # Individual Student Analysis
+        # -----------------------------
+        if "Student Name" in df.columns:
+
+            st.subheader("👨‍🎓 Individual Student Performance")
+
+            student_name = st.selectbox(
+                "Select Student",
+                df["Student Name"].unique()
+            )
+
+            student_data = df[
+                df["Student Name"] == student_name
+            ].iloc[0]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                st.metric(
+                    "Total Marks",
+                    round(
+                        student_data["Total"],
+                        2
+                    )
+                )
+
+            with col2:
+
+                st.metric(
+                    "Average",
+                    round(
+                        student_data["Average"],
+                        2
+                    )
+                )
+
+            # -----------------------------
+            # Selected Student Chart
+            # -----------------------------
+            st.subheader("📊 Subject-wise Marks")
+
+            student_marks = student_data[
+                subject_cols
+            ]
+
+            st.bar_chart(
+                student_marks
+            )
+
+        # -----------------------------
+        # Complete Analysis Table
+        # -----------------------------
+        st.subheader("📋 Complete Analysis")
+
+        st.dataframe(
+            df,
+            use_container_width=True
         )
 
-    st.subheader("📈 Subject-wise Average")
+else:
 
-    subject_average = df[available_subjects].mean()
-
-    st.bar_chart(subject_average)
-
-    st.subheader("🏆 Top 5 Students")
-
-    top5 = df.sort_values(
-        "Total",
-        ascending=False
-    ).head(5)
-
-    st.dataframe(
-        top5[
-            ["Student Name", "Total", "Average"]
-        ],
-        use_container_width=True
+    st.info(
+        "👆 Please upload a CSV file to start analysis."
     )
-    # Section-wise Analysis
-st.subheader("📚 Section-wise Analysis")
-
-# Section-wise Analysis
-st.subheader("📚 Section-wise Analysis")
-
-subjects = [
-    "Mathematics",
-    "Science",
-    "English",
-    "Hindi",
-    "Social Science",
-    "Computer"
-]
-
-subject_cols = [col for col in subjects if col in df.columns]
-
-section_average = df.groupby("Section")[subject_cols].mean()
-section_average = section_average.mean(axis=1)
-
-st.bar_chart(section_average)
-
-# Student Performance
-st.subheader("👨‍🎓 Student Performance")
-
-student_name = st.selectbox(
-    "Select Student",
-    df["Student Name"].unique()
-)
-
-student_data = df[df["Student Name"] == student_name].iloc[0]
-
-st.write("### Selected Student")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("Total Marks", round(student_data["Total"], 2))
-
-with col2:
-    st.metric("Average", round(student_data["Average"], 2))
-
-
-# Selected student's subject marks
-marks = student_data[available_subjects]
 
 st.subheader("📊 Subject-wise Marks")
 
