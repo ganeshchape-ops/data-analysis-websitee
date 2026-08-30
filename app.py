@@ -533,3 +533,7 @@ if file is not None:
         st.warning("Subject columns not found in CSV.")
 else:
     st.info("👆 Please upload a CSV file to start analysis.")
+
+st.title("📊 Data Analysis Website")
+st.write("👨‍💻 Developed by: Ganesh Chape")
+st.write("Welcome to my Data Analysis Website!")
