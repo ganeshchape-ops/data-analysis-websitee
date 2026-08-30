@@ -266,15 +266,91 @@ def api_analysis():
     }
     return jsonify(payload)
 
+import streamlit as st
+import pandas as pd
+
+st.set_page_config(
+    page_title="Data Analysis Website",
+    page_icon="📊",
+    layout="wide"
+)
+
 st.title("📊 Data Analysis Website")
 
-uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+uploaded_file = st.file_uploader(
+    "Upload CSV File",
+    type=["csv"]
+)
 
-if uploaded_file:
+if uploaded_file is not None:
+
     df = pd.read_csv(uploaded_file)
 
-    st.subheader("Dataset")
-    st.dataframe(df)
+    st.subheader("📋 Dataset")
+    st.dataframe(df, use_container_width=True)
 
-    st.subheader("Statistics")
-    st.write(df.describe())
+    # Marks columns
+    subjects = [
+        "Mathematics",
+        "Science",
+        "English",
+        "Hindi",
+        "Social Science",
+        "Computer"
+    ]
+
+    # Check columns
+    available_subjects = [
+        col for col in subjects if col in df.columns
+    ]
+
+    # Total and Average
+    df["Total"] = df[available_subjects].sum(axis=1)
+    df["Average"] = df[available_subjects].mean(axis=1)
+
+    st.subheader("📊 Student Performance")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "👨‍🎓 Total Students",
+            len(df)
+        )
+
+    with col2:
+        st.metric(
+            "📈 Overall Average",
+            round(df["Average"].mean(), 2)
+        )
+
+    with col3:
+        top_student = df.loc[
+            df["Total"].idxmax(),
+            "Student Name"
+        ]
+
+        st.metric(
+            "🏆 Top Student",
+            top_student
+        )
+
+    st.subheader("📈 Subject-wise Average")
+
+    subject_average = df[available_subjects].mean()
+
+    st.bar_chart(subject_average)
+
+    st.subheader("🏆 Top 5 Students")
+
+    top5 = df.sort_values(
+        "Total",
+        ascending=False
+    ).head(5)
+
+    st.dataframe(
+        top5[
+            ["Student Name", "Total", "Average"]
+        ],
+        use_container_width=True
+    )
