@@ -535,5 +535,5 @@ else:
     st.info("👆 Please upload a CSV file to start analysis.")
 
 st.title("📊 Data Analysis Website")
-st.write("👨‍💻 Developed by: Ganesh Chape and saurabh misal")
+st.write("👨‍💻 Developed by: saurabh krishna misal ")
 st.write("Welcome to my Data Analysis Website!")
