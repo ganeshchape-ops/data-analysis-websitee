@@ -360,11 +360,21 @@ st.subheader("📚 Section-wise Analysis")
 # Section-wise Analysis
 st.subheader("📚 Section-wise Analysis")
 
-section_average = df.groupby("Section")[available_subjects].mean()
+subjects = [
+    "Mathematics",
+    "Science",
+    "English",
+    "Hindi",
+    "Social Science",
+    "Computer"
+]
+
+subject_cols = [col for col in subjects if col in df.columns]
+
+section_average = df.groupby("Section")[subject_cols].mean()
 section_average = section_average.mean(axis=1)
 
 st.bar_chart(section_average)
-
 
 # Student Performance
 st.subheader("👨‍🎓 Student Performance")
