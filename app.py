@@ -508,4 +508,4 @@ else:
 
 st.subheader("📊 Subject-wise Marks")
 
-st.bar_chart(marks)
+st.bar_chart(df[subjects].mean())
