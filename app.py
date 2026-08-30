@@ -357,7 +357,11 @@ if uploaded_file is not None:
     # Section-wise Analysis
 st.subheader("📚 Section-wise Analysis")
 
-section_average = df.groupby("Section")["Average"].mean()
+# Section-wise Analysis
+st.subheader("📚 Section-wise Analysis")
+
+section_average = df.groupby("Section")[available_subjects].mean()
+section_average = section_average.mean(axis=1)
 
 st.bar_chart(section_average)
 
