@@ -533,7 +533,540 @@ if file is not None:
         st.warning("Subject columns not found in CSV.")
 else:
     st.info("👆 Please upload a CSV file to start analysis.")
+import streamlit as st
+import pandas as pd
+import numpy as np
+import io
 
+# -------------------------------------------------
+# PAGE CONFIG
+# -------------------------------------------------
+st.set_page_config(
+    page_title="EduMetrics Pro",
+    page_icon="🎓",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# -------------------------------------------------
+# CSS - MODERN DARK UI
+# -------------------------------------------------
+st.markdown("""
+<style>
+    .stApp {
+        background: linear-gradient(135deg, #080b24, #11183d, #18245a);
+        color: white;
+    }
+
+    .block-container {
+        padding-top: 1rem;
+        max-width: 1200px;
+    }
+
+    .brand {
+        font-size: 25px;
+        font-weight: 800;
+        color: white;
+        padding: 10px 0;
+    }
+
+    .hero {
+        text-align: center;
+        padding: 70px 20px 35px 20px;
+    }
+
+    .hero h1 {
+        font-size: 48px;
+        font-weight: 800;
+        margin-bottom: 15px;
+    }
+
+    .hero p {
+        font-size: 18px;
+        color: #d5d9f5;
+        max-width: 800px;
+        margin: auto;
+    }
+
+    .upload-box {
+        border: 2px dashed #6574e8;
+        border-radius: 25px;
+        padding: 45px;
+        text-align: center;
+        background: rgba(90, 105, 220, 0.12);
+        margin: 20px 0;
+    }
+
+    .upload-title {
+        font-size: 22px;
+        font-weight: 700;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 7px 14px;
+        margin: 10px 4px;
+        border-radius: 8px;
+        background: rgba(100,120,255,0.25);
+        font-weight: 600;
+    }
+
+    .card {
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 18px;
+        padding: 20px;
+        margin-bottom: 15px;
+    }
+
+    .developer {
+        text-align: center;
+        color: #bfc6ed;
+        padding: 35px;
+        font-size: 15px;
+    }
+
+    div[data-testid="stMetric"] {
+        background: rgba(255,255,255,0.07);
+        padding: 15px;
+        border-radius: 15px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------
+# HEADER
+# -------------------------------------------------
+c1, c2, c3, c4 = st.columns([3, 1, 1, 1])
+
+with c1:
+    st.markdown(
+        '<div class="brand">🎓 EduMetrics Pro</div>',
+        unsafe_allow_html=True
+    )
+
+with c2:
+    st.markdown("🏠 New Upload")
+
+with c3:
+    st.markdown("⚡ Clean Demo")
+
+with c4:
+    st.markdown("🧪 Anomaly Test")
+
+# -------------------------------------------------
+# HERO SECTION
+# -------------------------------------------------
+st.markdown("""
+<div class="hero">
+    <h1>Student Performance Analytics Engine</h1>
+
+    <p>
+        Upload student records in Excel (.xlsx, .xls) or CSV (.csv) format.
+        Automatically performs section-wise benchmarking,
+        subject-wise statistical analysis, anomaly checks,
+        and generates useful performance reports.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# -------------------------------------------------
+# UPLOAD SECTION
+# -------------------------------------------------
+st.markdown("""
+<div class="upload-box">
+    <div style="font-size:50px;">☁️</div>
+    <div class="upload-title">
+        Drag and drop your student dataset here
+    </div>
+    <p>or click below to browse files from your computer</p>
+
+    <span class="badge">XLSX</span>
+    <span class="badge">CSV</span>
+    <span class="badge">XLS</span>
+</div>
+""", unsafe_allow_html=True)
+
+uploaded_file = st.file_uploader(
+    "Upload Student Dataset",
+    type=["csv", "xlsx", "xls"],
+    label_visibility="collapsed"
+)
+
+# -------------------------------------------------
+# FUNCTION TO READ FILE
+# -------------------------------------------------
+def read_file(file):
+
+    try:
+        if file.name.lower().endswith(".csv"):
+            return pd.read_csv(file)
+
+        elif file.name.lower().endswith((".xlsx", ".xls")):
+            return pd.read_excel(file)
+
+    except Exception as e:
+        st.error("Unable to read this file.")
+        st.error(str(e))
+        return None
+
+    return None
+
+
+# -------------------------------------------------
+# MAIN APP
+# -------------------------------------------------
+if uploaded_file is not None:
+
+    # IMPORTANT: df is created here
+    df = read_file(uploaded_file)
+
+    if df is None:
+        st.stop()
+
+    # Clean column names
+    df.columns = df.columns.astype(str).str.strip()
+
+    # Remove completely empty columns
+    df = df.dropna(axis=1, how="all")
+
+    st.success(
+        f"✅ File uploaded successfully: {uploaded_file.name}"
+    )
+
+    # -------------------------------------------------
+    # DATASET
+    # -------------------------------------------------
+    st.header("📊 Dataset")
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        height=350
+    )
+
+    # -------------------------------------------------
+    # FIND SUBJECT COLUMNS AUTOMATICALLY
+    # -------------------------------------------------
+
+    excluded_columns = [
+        "Student Name",
+        "Student",
+        "Name",
+        "Section",
+        "Roll No",
+        "Roll Number",
+        "ID",
+        "Gender"
+    ]
+
+    subjects = []
+
+    for col in df.columns:
+
+        if col not in excluded_columns:
+
+            # Convert to numeric
+            numeric_values = pd.to_numeric(
+                df[col],
+                errors="coerce"
+            )
+
+            # Consider it a subject if it has numeric values
+            if numeric_values.notna().sum() > 0:
+                subjects.append(col)
+
+    # This prevents subject_cols NameError
+    subject_cols = [
+        col for col in subjects
+        if col in df.columns
+    ]
+
+    # Convert subject columns to numbers
+    for col in subject_cols:
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        )
+
+    # -------------------------------------------------
+    # TOTAL AND AVERAGE
+    # -------------------------------------------------
+
+    if len(subject_cols) > 0:
+
+        df["Total"] = df[subject_cols].sum(
+            axis=1,
+            skipna=True
+        )
+
+        df["Average"] = df[subject_cols].mean(
+            axis=1,
+            skipna=True
+        )
+
+    else:
+        st.warning(
+            "⚠️ No numeric subject columns found in the dataset."
+        )
+        st.stop()
+
+    # -------------------------------------------------
+    # DASHBOARD
+    # -------------------------------------------------
+
+    st.header("📈 Student Performance")
+
+    total_students = len(df)
+
+    overall_average = round(
+        df["Average"].mean(),
+        2
+    )
+
+    top_index = df["Average"].idxmax()
+
+    # Safely find student name
+    name_column = None
+
+    for possible in [
+        "Student Name",
+        "Student",
+        "Name"
+    ]:
+        if possible in df.columns:
+            name_column = possible
+            break
+
+    if name_column:
+        top_student = df.loc[
+            top_index,
+            name_column
+        ]
+    else:
+        top_student = f"Student {top_index + 1}"
+
+    m1, m2, m3 = st.columns(3)
+
+    with m1:
+        st.metric(
+            "👨‍🎓 Total Students",
+            total_students
+        )
+
+    with m2:
+        st.metric(
+            "📊 Overall Average",
+            overall_average
+        )
+
+    with m3:
+        st.metric(
+            "🏆 Top Student",
+            str(top_student)
+        )
+
+    # -------------------------------------------------
+    # SUBJECT-WISE AVERAGE
+    # -------------------------------------------------
+
+    st.subheader("📊 Subject-wise Average")
+
+    subject_average = df[subject_cols].mean()
+
+    st.bar_chart(subject_average)
+
+    # -------------------------------------------------
+    # SECTION-WISE ANALYSIS
+    # -------------------------------------------------
+
+    if "Section" in df.columns:
+
+        st.subheader("📚 Section-wise Analysis")
+
+        section_average = (
+            df.groupby("Section")["Average"]
+            .mean()
+            .sort_values(ascending=False)
+        )
+
+        st.bar_chart(section_average)
+
+        st.dataframe(
+            section_average.reset_index(
+                name="Average"
+            ),
+            use_container_width=True
+        )
+
+    # -------------------------------------------------
+    # STUDENT SELECTOR
+    # -------------------------------------------------
+
+    st.subheader("👨‍🎓 Student Performance")
+
+    if name_column:
+
+        student_list = (
+            df[name_column]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+
+        if student_list:
+
+            selected_student = st.selectbox(
+                "Select Student",
+                student_list
+            )
+
+            student_data = df[
+                df[name_column].astype(str)
+                == selected_student
+            ].iloc[0]
+
+            st.markdown(
+                f"### Selected Student: {selected_student}"
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.metric(
+                    "Total Marks",
+                    round(
+                        float(student_data["Total"]),
+                        2
+                    )
+                )
+
+            with col2:
+                st.metric(
+                    "Average",
+                    round(
+                        float(student_data["Average"]),
+                        2
+                    )
+                )
+
+            # Student subject marks
+            marks = student_data[
+                subject_cols
+            ].astype(float)
+
+            st.subheader("📊 Subject-wise Marks")
+
+            # IMPORTANT:
+            # marks is defined before st.bar_chart
+            st.bar_chart(marks)
+
+            st.dataframe(
+                marks.reset_index(
+                    name="Marks"
+                ),
+                use_container_width=True
+            )
+
+    # -------------------------------------------------
+    # TOP STUDENTS
+    # -------------------------------------------------
+
+    st.subheader("🏆 Top Students")
+
+    top_columns = []
+
+    if name_column:
+        top_columns.append(name_column)
+
+    top_columns += [
+        "Total",
+        "Average"
+    ]
+
+    top_students = (
+        df[top_columns]
+        .sort_values(
+            "Average",
+            ascending=False
+        )
+        .head(10)
+    )
+
+    st.dataframe(
+        top_students,
+        use_container_width=True
+    )
+
+    # -------------------------------------------------
+    # DOWNLOAD REPORT
+    # -------------------------------------------------
+
+    st.subheader("📥 Download Analysis")
+
+    output = io.BytesIO()
+
+    with pd.ExcelWriter(
+        output,
+        engine="openpyxl"
+    ) as writer:
+
+        df.to_excel(
+            writer,
+            sheet_name="Student Data",
+            index=False
+        )
+
+        subject_average.reset_index(
+            name="Average"
+        ).to_excel(
+            writer,
+            sheet_name="Subject Average",
+            index=False
+        )
+
+        if "Section" in df.columns:
+
+            section_average.reset_index(
+                name="Average"
+            ).to_excel(
+                writer,
+                sheet_name="Section Average",
+                index=False
+            )
+
+        top_students.to_excel(
+            writer,
+            sheet_name="Top Students",
+            index=False
+        )
+
+    st.download_button(
+        label="📥 Download Excel Report",
+        data=output.getvalue(),
+        file_name="Student_Performance_Report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+else:
+
+    st.info(
+        "👆 Please upload a CSV or Excel file to start analysis."
+    )
+
+
+# -------------------------------------------------
+# DEVELOPER
+# -------------------------------------------------
+st.markdown("""
+<div class="developer">
+    <hr>
+    <b>Developed by Ganesh</b><br>
+    Student Performance Analytics Project<br>
+    © 2026 EduMetrics Pro
+</div>
+""", unsafe_allow_html=True)
 st.title("📊 Data Analysis Website")
 st.write("👨‍💻 Developed by: Ganesh chape and saurabh misal ")
 st.write("Welcome to my Data Analysis Website!")
