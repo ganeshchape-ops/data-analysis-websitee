@@ -3,7 +3,7 @@ Student Data Analysis Web Application
 Flask backend providing file upload, data cleaning, 6-subject section analysis,
 interactive dashboard, chart rendering, and 11-sheet Excel generation.
 """
-
+import streamlit as st 
 import os
 import io
 import uuid
@@ -267,5 +267,5 @@ def api_analysis():
     return jsonify(payload)
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+st.title("my website")
+st.write("welcome")
