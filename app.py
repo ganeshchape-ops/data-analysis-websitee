@@ -354,3 +354,38 @@ if uploaded_file is not None:
         ],
         use_container_width=True
     )
+    # Section-wise Analysis
+st.subheader("📚 Section-wise Analysis")
+
+section_average = df.groupby("Section")["Average"].mean()
+
+st.bar_chart(section_average)
+
+
+# Student Performance
+st.subheader("👨‍🎓 Student Performance")
+
+student_name = st.selectbox(
+    "Select Student",
+    df["Student Name"].unique()
+)
+
+student_data = df[df["Student Name"] == student_name].iloc[0]
+
+st.write("### Selected Student")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.metric("Total Marks", round(student_data["Total"], 2))
+
+with col2:
+    st.metric("Average", round(student_data["Average"], 2))
+
+
+# Selected student's subject marks
+marks = student_data[available_subjects]
+
+st.subheader("📊 Subject-wise Marks")
+
+st.bar_chart(marks)
