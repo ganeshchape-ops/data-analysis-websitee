@@ -1,0 +1,271 @@
+"""
+Student Data Analysis Web Application
+Flask backend providing file upload, data cleaning, 6-subject section analysis,
+interactive dashboard, chart rendering, and 11-sheet Excel generation.
+"""
+
+import os
+import io
+import uuid
+from typing import Dict, Any
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
+from werkzeug.utils import secure_filename
+import pandas as pd
+
+from utils.data_loader import load_raw_data, detect_column_mapping, apply_column_mapping
+from utils.data_cleaning import clean_student_data
+from utils.analysis import perform_full_analysis
+from utils.insights import generate_automated_insights
+from utils.visualization import generate_all_visualizations, prepare_chartjs_data
+from utils.excel_report import generate_excel_report
+
+
+app = Flask(__name__)
+app.secret_key = "student_analytics_executive_key_2026"
+
+# Configure directories
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+OUTPUT_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "outputs")
+DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+os.makedirs(DATA_FOLDER, exist_ok=True)
+
+# In-memory store for active session analysis
+ACTIVE_ANALYSIS_STORE: Dict[str, Any] = {}
+
+
+def run_pipeline(file_path: str, filename: str, pass_mark: float = 40.0, max_subject_mark: float = 100.0, remove_duplicates: bool = True) -> Dict[str, Any]:
+    """
+    Executes the end-to-end analytical pipeline:
+    Loader -> Fuzzy Mapping -> Cleaning & Audit -> Math Engine -> Visualizations -> Excel Report.
+    """
+    # 1. Load raw dataset
+    raw_df = load_raw_data(file_path, filename)
+    
+    # 2. Detect column mapping
+    mapping_info = detect_column_mapping(raw_df)
+    if not mapping_info["is_valid"]:
+        missing_str = ", ".join(mapping_info["missing_required"])
+        raise ValueError(f"Required columns could not be identified: {missing_str}. Please verify file headers.")
+
+    # 3. Apply column mapping
+    std_df, display_names = apply_column_mapping(raw_df, mapping_info["mapping"])
+    subject_keys = display_names["_subject_keys"]
+
+    # 4. Clean data & generate quality audit
+    cleaned_df, quality_summary = clean_student_data(
+        df=std_df,
+        subject_keys=subject_keys,
+        display_names=display_names,
+        min_mark=0.0,
+        max_mark=max_subject_mark,
+        remove_duplicates=remove_duplicates
+    )
+
+    # 5. Perform mathematical analysis
+    analysis_results = perform_full_analysis(
+        df=cleaned_df,
+        subject_keys=subject_keys,
+        display_names=display_names,
+        pass_mark=pass_mark,
+        max_subject_mark=max_subject_mark
+    )
+
+    # 6. Generate 100% data-driven automated insights
+    insights = generate_automated_insights(analysis_results, quality_summary)
+
+    # 7. Generate publication charts & Chart.js payloads
+    charts_dir = os.path.join(OUTPUT_FOLDER, "charts")
+    charts_b64 = generate_all_visualizations(analysis_results, output_dir=charts_dir)
+    chartjs_data = prepare_chartjs_data(analysis_results)
+
+    # 8. Generate 11-Sheet Excel Report
+    report_filename = f"Student_Analysis_Report_{uuid.uuid4().hex[:8]}.xlsx"
+    excel_report_path = os.path.join(OUTPUT_FOLDER, report_filename)
+    generate_excel_report(
+        raw_df=raw_df,
+        analysis_results=analysis_results,
+        quality_summary=quality_summary,
+        insights=insights,
+        output_path=excel_report_path
+    )
+
+    # Save to active store
+    ACTIVE_ANALYSIS_STORE["current"] = {
+        "raw_df": raw_df,
+        "filename": filename,
+        "analysis_results": analysis_results,
+        "quality_summary": quality_summary,
+        "insights": insights,
+        "charts_b64": charts_b64,
+        "chartjs_data": chartjs_data,
+        "excel_report_path": excel_report_path,
+        "report_filename": report_filename
+    }
+
+    return ACTIVE_ANALYSIS_STORE["current"]
+
+
+@app.route("/")
+def index():
+    """Landing page with file upload and demo controls."""
+    return render_template("index.html")
+
+
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    """Handles dataset upload and initiates analysis."""
+    if "file" not in request.files:
+        flash("No file selected for upload.", "error")
+        return redirect(url_for("index"))
+
+    file = request.files["file"]
+    if file.filename == "":
+        flash("No file selected.", "error")
+        return redirect(url_for("index"))
+
+    # Configurable parameters
+    pass_mark = float(request.form.get("pass_mark", 40.0))
+    max_subject_mark = float(request.form.get("max_subject_mark", 100.0))
+    remove_duplicates = request.form.get("remove_duplicates") == "true"
+
+    filename = secure_filename(file.filename)
+    save_path = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(save_path)
+
+    try:
+        run_pipeline(
+            file_path=save_path,
+            filename=filename,
+            pass_mark=pass_mark,
+            max_subject_mark=max_subject_mark,
+            remove_duplicates=remove_duplicates
+        )
+        return redirect(url_for("dashboard"))
+    except Exception as e:
+        flash(f"Analysis failed: {str(e)}", "error")
+        return redirect(url_for("index"))
+
+
+@app.route("/demo/<demo_type>")
+def load_demo(demo_type: str):
+    """Loads pre-generated demo datasets for instant testing."""
+    if demo_type == "dirty":
+        demo_file = os.path.join(DATA_FOLDER, "dirty_sample_students.xlsx")
+        filename = "dirty_sample_students.xlsx"
+    else:
+        demo_file = os.path.join(DATA_FOLDER, "sample_students_data.xlsx")
+        filename = "sample_students_data.xlsx"
+
+    if not os.path.exists(demo_file):
+        # Auto generate if not found
+        from generate_sample_data import generate_sample_datasets
+        generate_sample_datasets()
+
+    try:
+        run_pipeline(demo_file, filename)
+        flash(f"Loaded demo dataset '{filename}' successfully!", "success")
+        return redirect(url_for("dashboard"))
+    except Exception as e:
+        flash(f"Failed to load demo: {str(e)}", "error")
+        return redirect(url_for("index"))
+
+
+@app.route("/dashboard")
+def dashboard():
+    """Renders the executive analytical dashboard."""
+    if "current" not in ACTIVE_ANALYSIS_STORE:
+        # Load clean demo as default if user visits /dashboard directly
+        return redirect(url_for("load_demo", demo_type="clean"))
+
+    data = ACTIVE_ANALYSIS_STORE["current"]
+    res = data["analysis_results"]
+
+    return render_template(
+        "dashboard.html",
+        filename=data["filename"],
+        overall_stats=res["overall_stats"],
+        section_summary_df=res["section_summary_df"],
+        section_highlights=res["section_highlights"],
+        subject_summary_df=res["subject_summary_df"],
+        subject_highlights=res["subject_highlights"],
+        average_matrix_df=res["average_matrix_df"],
+        pass_matrix_df=res["pass_matrix_df"],
+        student_df=res["student_df"],
+        top_10_df=res["top_10_df"],
+        at_risk_df=res["at_risk_df"],
+        quality_summary=data["quality_summary"],
+        insights=data["insights"],
+        charts_b64=data["charts_b64"],
+        chartjs_data=data["chartjs_data"],
+        subject_keys=res["subject_keys"],
+        display_names=res["display_names"]
+    )
+
+
+@app.route("/export/excel")
+def export_excel():
+    """Downloads the generated 11-sheet Excel report."""
+    if "current" not in ACTIVE_ANALYSIS_STORE:
+        flash("No active analysis to export. Please upload a file first.", "error")
+        return redirect(url_for("index"))
+
+    path = ACTIVE_ANALYSIS_STORE["current"]["excel_report_path"]
+    filename = ACTIVE_ANALYSIS_STORE["current"]["report_filename"]
+    return send_file(path, as_attachment=True, download_name=filename)
+
+
+@app.route("/export/csv")
+def export_csv():
+    """Exports cleaned and analyzed student performance roster as CSV."""
+    if "current" not in ACTIVE_ANALYSIS_STORE:
+        flash("No active analysis to export.", "error")
+        return redirect(url_for("index"))
+
+    student_df = ACTIVE_ANALYSIS_STORE["current"]["analysis_results"]["student_df"]
+    csv_buffer = io.StringIO()
+    student_df.to_csv(csv_buffer, index=False)
+    csv_bytes = io.BytesIO(csv_buffer.getvalue().encode("utf-8"))
+
+    return send_file(
+        csv_bytes,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=f"Student_Performance_Roster_{uuid.uuid4().hex[:6]}.csv"
+    )
+
+
+@app.route("/api/analysis")
+def api_analysis():
+    """REST API endpoint returning complete analytical JSON dataset."""
+    if "current" not in ACTIVE_ANALYSIS_STORE:
+        return jsonify({"error": "No active dataset loaded"}), 400
+
+    data = ACTIVE_ANALYSIS_STORE["current"]
+    res = data["analysis_results"]
+
+    payload = {
+        "filename": data["filename"],
+        "overall_stats": res["overall_stats"],
+        "section_summary": res["section_summary_df"].to_dict(orient="records"),
+        "subject_summary": res["subject_summary_df"].to_dict(orient="records"),
+        "average_matrix": res["average_matrix_df"].to_dict(orient="records"),
+        "pass_matrix": res["pass_matrix_df"].to_dict(orient="records"),
+        "top_10": res["top_10_df"].to_dict(orient="records"),
+        "at_risk_count": len(res["at_risk_df"]),
+        "quality_summary": {
+            "health_score": data["quality_summary"]["quality_score"],
+            "total_records": data["quality_summary"]["valid_records"],
+            "duplicates_purged": data["quality_summary"]["duplicate_rows"] + data["quality_summary"]["duplicate_ids"],
+            "missing_marks": data["quality_summary"]["missing_marks_count"],
+            "invalid_marks": data["quality_summary"]["invalid_marks_count"]
+        },
+        "insights": data["insights"]
+    }
+    return jsonify(payload)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

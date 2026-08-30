@@ -1,0 +1,21 @@
+Student_ID,Student_Name,Assignment_Marks,Midterm_Marks,Final_Exam_Marks,Project_Marks,Total_Marks_Percent,Grade,Attendance_Percent,Class_Activities_Count,Participation_Percent,Study_Hours_Per_Week,Result
+STU001,Aarav Sharma,95,57,53,74,64.5,C,93,5,70,2.8,Pass
+STU002,Ananya Patil,61,93,86,62,79.2,B,72,10,82,2.2,Pass
+STU003,Rohan Verma,68,64,84,72,74.2,B,89,1,90,6.3,Pass
+STU004,Sneha Joshi,89,76,66,60,70.8,B,84,10,72,6.6,Pass
+STU005,Aditya Singh,65,94,79,73,79.4,B,80,5,64,7.7,Pass
+STU006,Priya Deshmukh,76,56,57,82,64.6,C,82,2,77,5.6,Pass
+STU007,Rahul Gupta,57,79,86,95,81.7,B,73,7,60,3.8,Pass
+STU008,Ishita Kulkarni,95,89,75,64,79.3,B,88,4,100,2.3,Pass
+STU009,Vikram Rao,69,68,57,84,67.0,C,97,4,61,3.7,Pass
+STU010,Neha Pawar,95,73,62,77,72.7,B,81,6,68,6.2,Pass
+STU011,Arjun Mehta,98,91,56,75,74.9,B,89,3,89,3.0,Pass
+STU012,Kavya Shah,79,67,92,80,81.4,B,92,9,69,7.1,Pass
+STU013,Siddharth Jain,58,64,54,77,61.7,C,95,6,80,2.4,Pass
+STU014,Meera Nair,91,95,72,89,84.0,B,76,8,80,2.9,Pass
+STU015,Kunal Yadav,63,65,87,87,77.9,B,87,5,92,7.4,Pass
+STU016,Riya Mishra,80,73,66,65,69.7,C,74,9,86,6.5,Pass
+STU017,Manish Thakur,62,59,92,64,73.7,B,75,7,93,4.3,Pass
+STU018,Pooja Soni,93,79,85,67,81.1,B,78,9,55,6.1,Pass
+STU019,Akash More,89,67,93,87,84.7,B,80,2,73,2.9,Pass
+STU020,Tanvi Bhosale,55,66,84,66,71.5,B,94,3,87,7.2,Pass

@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Student Dataset – Student Data Analysis Studio{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Hero Section -->
+    <div class="hero-section">
+        <h1 class="hero-title">Student Performance Analytics Engine</h1>
+        <p class="hero-subtitle">
+            Upload student records in Excel (<span style="color: #60A5FA;">.xlsx, .xls</span>) or CSV (<span style="color: #34D399;">.csv</span>) format. 
+            Automatically executes section-wise benchmarking, 6-subject statistical analysis, anomaly audits, and generates executive 11-sheet Excel workbooks.
+        </p>
+
+        <!-- Upload Form -->
+        <form id="uploadForm" action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+            <input type="file" id="fileInput" name="file" accept=".xlsx, .xls, .csv" style="display: none;" required>
+            
+            <div class="dropzone-container" id="dropzone">
+                <div class="dropzone-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+                <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">
+                    Drag and drop your student dataset here
+                </h3>
+                <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
+                    or click to browse files from your computer
+                </p>
+
+                <div class="file-types-badge">
+                    <span class="badge badge-blue">.XLSX</span>
+                    <span class="badge badge-green">.CSV</span>
+                    <span class="badge badge-purple">.XLS</span>
+                </div>
+
+                <div id="fileNameDisplay" style="margin-top: 1.25rem;"></div>
+            </div>
+
+            <!-- Analysis Options Accordion -->
+            <div class="card" style="margin-top: 1.5rem; text-align: left;">
+                <div class="card-header" style="margin-bottom: 0.75rem;">
+                    <div class="card-title">
+                        ⚙️ Analysis Configuration Parameters
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                    <div>
+                        <label class="filter-label" for="passMarkInput">Passing Threshold (Marks)</label>
+                        <input type="number" id="passMarkInput" name="pass_mark" class="form-control" style="width: 100%; margin-top: 0.35rem;" value="40" min="1" max="100" step="1">
+                    </div>
+                    <div>
+                        <label class="filter-label" for="maxMarkInput">Max Subject Marks</label>
+                        <input type="number" id="maxMarkInput" name="max_subject_mark" class="form-control" style="width: 100%; margin-top: 0.35rem;" value="100" min="10" max="1000" step="1">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+                        <input type="checkbox" id="removeDupCheck" name="remove_duplicates" value="true" checked style="width: 18px; height: 18px; accent-color: var(--primary);">
+                        <label for="removeDupCheck" style="font-size: 0.85rem; font-weight: 600; cursor: pointer;">
+                            Auto-Purge Duplicate Records
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem;">
+                <button type="submit" class="btn btn-primary" style="padding: 0.85rem 2.5rem; font-size: 1.05rem;">
+                    🚀 Upload & Analyze Dataset
+                </button>
+            </div>
+        </form>
+
+        <!-- Quick 1-Click Demo Buttons -->
+        <div class="demo-actions">
+            <span style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;">Or launch with instant demo:</span>
+            <a href="{{ url_for('load_demo', demo_type='clean') }}" class="btn btn-outline">
+                ⚡ Clean Demo (120 Students, 4 Sections, 6 Subjects)
+            </a>
+            <a href="{{ url_for('load_demo', demo_type='dirty') }}" class="btn btn-outline">
+                🧪 Anomaly Demo (With Duplicates & Edge Cases)
+            </a>
+        </div>
+    </div>
+
+    <!-- Feature Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 3rem;">
+        <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 0.75rem;">📊</div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Section-Wise Benchmarking</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5;">
+                Compares section averages, medians, pass rates, score ranges, and consistency indices (standard deviation).
+            </p>
+        </div>
+
+        <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 0.75rem;">🎯</div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">6-Subject Deep Dive</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5;">
+                Individual metrics for all 6 subjects: mean, pass count, failure distribution, and highest/lowest subject identification.
+            </p>
+        </div>
+
+        <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 0.75rem;">🔲</div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">Section × Subject Matrix</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5;">
+                Cross-tabulated performance heatmaps showing strongest and weakest subject areas per classroom section.
+            </p>
+        </div>
+
+        <div class="card">
+            <div style="font-size: 1.5rem; margin-bottom: 0.75rem;">📥</div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;">11-Sheet Excel Engine</h3>
+            <p style="color: var(--text-secondary); font-size: 0.88rem; line-height: 1.5;">
+                Generates a multi-tab formatted Excel workbook complete with KPI dashboard, frozen headers, and color-coded status badges.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student Data Analysis Studio{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    <!-- Executive Navigation Bar -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <div class="brand-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                    <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                </svg>
+            </div>
+            <div>
+                <span>EduMetrics Pro</span>
+                <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-muted); display: block; line-height: 1;">Section & 6-Subject Analytics</span>
+            </div>
+        </div>
+
+        <div class="nav-actions">
+            <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                New Upload
+            </a>
+
+            <div class="demo-dropdown" style="display: inline-flex; gap: 0.5rem;">
+                <a href="{{ url_for('load_demo', demo_type='clean') }}" class="btn btn-outline btn-sm" title="Load clean demo dataset with 120 students across 4 sections">
+                    ⚡ Clean Demo
+                </a>
+                <a href="{{ url_for('load_demo', demo_type='dirty') }}" class="btn btn-outline btn-sm" title="Load dirty dataset to test anomaly detection">
+                    🧪 Anomaly Test
+                </a>
+            </div>
+
+            <button id="themeToggleBtn" class="btn btn-outline btn-icon" title="Toggle Theme" aria-label="Toggle Theme">
+                ☀️
+            </button>
+        </div>
+    </header>
+
+    <!-- Flash Alert Messages -->
+    <div class="container" style="padding-top: 1rem; padding-bottom: 0;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="insight-card alert-{{ 'danger' if category == 'error' else category }}" style="margin-bottom: 1rem;">
+                        <div class="insight-title">
+                            {% if category == 'error' %}⚠️ System Alert{% else %}ℹ️ Notice{% endif %}
+                        </div>
+                        <div class="insight-body">{{ message }}</div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Main Dynamic Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Executive Footer -->
+    <footer class="footer">
+        <div>
+            <strong>Student Data Analysis Studio</strong> • Professional Analytics & Multi-Sheet Excel Engine
+        </div>
+        <div style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-muted);">
+            Section-wise & 6-Subject Performance Analytics Engine • Client-Ready Architecture
+        </div>
+    </footer>
+
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

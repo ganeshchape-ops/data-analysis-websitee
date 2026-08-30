@@ -1,0 +1,764 @@
+{% extends "base.html" %}
+
+{% block title %}Executive Analytics Dashboard – Student Data Analysis Studio{% endblock %}
+
+{% block extra_head %}
+<script>
+    // Embedded Chart.js Payload
+    window.DASHBOARD_CHART_DATA = {{ chartjs_data | tojson | safe }};
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    
+    <!-- Top Action & Metadata Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem;">
+        <div>
+            <h1 style="font-size: 1.85rem; font-weight: 800; color: var(--text-primary);">
+                Cohort Performance Analytics Dashboard
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;">
+                Source File: <strong style="color: var(--primary);">{{ filename }}</strong> • 
+                Evaluated <strong>{{ overall_stats.total_students }}</strong> students across <strong>{{ quality_summary.sections_count }}</strong> sections & <strong>{{ quality_summary.subjects_count }}</strong> subjects
+            </p>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <a href="{{ url_for('export_excel') }}" class="btn btn-success">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download 11-Sheet Excel Report (.xlsx)
+            </a>
+            <a href="{{ url_for('export_csv') }}" class="btn btn-outline">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Export CSV Roster
+            </a>
+            <button onclick="window.print()" class="btn btn-outline btn-icon" title="Print / Save PDF">
+                🖨️
+            </button>
+        </div>
+    </div>
+
+    <!-- Executive KPI Summary Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Students</div>
+            <div class="kpi-value">{{ overall_stats.total_students }}</div>
+            <div class="kpi-subtext">Active evaluated cohort</div>
+        </div>
+
+        <div class="kpi-card kpi-purple">
+            <div class="kpi-label">Assigned Sections</div>
+            <div class="kpi-value">{{ quality_summary.sections_count }}</div>
+            <div class="kpi-subtext">Sections: {{ quality_summary.sections | join(', ') }}</div>
+        </div>
+
+        <div class="kpi-card kpi-cyan">
+            <div class="kpi-label">Subjects Evaluated</div>
+            <div class="kpi-value">{{ quality_summary.subjects_count }}</div>
+            <div class="kpi-subtext">Individual subject streams</div>
+        </div>
+
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-label">Overall Average</div>
+            <div class="kpi-value">{{ overall_stats.overall_percentage }}%</div>
+            <div class="kpi-subtext">Median: {{ overall_stats.median_percentage }}% (Std: {{ overall_stats.std_dev }})</div>
+        </div>
+
+        <div class="kpi-card kpi-success">
+            <div class="kpi-label">Cohort Pass Rate</div>
+            <div class="kpi-value">{{ overall_stats.pass_percentage }}%</div>
+            <div class="kpi-subtext">{{ overall_stats.pass_count }} Passed / {{ overall_stats.fail_count }} Need Support</div>
+        </div>
+
+        <div class="kpi-card">
+            <div class="kpi-label">Data Health Score</div>
+            <div class="kpi-value" style="color: {% if quality_summary.quality_score >= 90 %}#34D399{% elif quality_summary.quality_score >= 70 %}#FBBF24{% else %}#F87171{% endif %};">
+                {{ quality_summary.quality_score }}
+            </div>
+            <div class="kpi-subtext">{{ quality_summary.missing_marks_count }} missing, {{ quality_summary.invalid_marks_count }} invalid</div>
+        </div>
+    </div>
+
+    <!-- Tabbed Navigation Bar -->
+    <div class="tabs-container">
+        <button class="tab-btn active" data-tab="tab-overview">📊 Overview & Charts</button>
+        <button class="tab-btn" data-tab="tab-sections">🏫 Section-Wise Analysis</button>
+        <button class="tab-btn" data-tab="tab-subjects">📚 6-Subject Analysis</button>
+        <button class="tab-btn" data-tab="tab-matrix">🔲 Section × Subject Matrix</button>
+        <button class="tab-btn" data-tab="tab-roster">📋 Student Master Roster</button>
+        <button class="tab-btn" data-tab="tab-top10">🏆 Top 10 High Achievers</button>
+        <button class="tab-btn" data-tab="tab-atrisk">⚠️ At-Risk Academic Support</button>
+        <button class="tab-btn" data-tab="tab-insights">💡 Automated Insights</button>
+        <button class="tab-btn" data-tab="tab-quality">🛡️ Data Quality Audit</button>
+    </div>
+
+    <!-- =========================================================================
+         TAB 1: OVERVIEW & INTERACTIVE CHARTS
+         ========================================================================= -->
+    <div id="tab-overview" class="tab-content" style="display: block;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+            <!-- Section Performance Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🏫 Section Performance Comparison</div>
+                </div>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="chartSectionPerformance"></canvas>
+                </div>
+            </div>
+
+            <!-- Subject Performance Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📚 Subject-Wise Average Scores</div>
+                </div>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="chartSubjectPerformance"></canvas>
+                </div>
+            </div>
+
+            <!-- Grade Distribution Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🎯 Cohort Grade Distribution</div>
+                </div>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="chartGradeDist"></canvas>
+                </div>
+            </div>
+
+            <!-- Top 10 Students Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🏆 Top 10 Students Performance</div>
+                </div>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="chartTopStudents"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 2: SECTION-WISE ANALYSIS
+         ========================================================================= -->
+    <div id="tab-sections" class="tab-content" style="display: none;">
+        <!-- Section Benchmark Highlights Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="insight-card alert-success" style="margin-bottom: 0;">
+                <div class="insight-title">🏆 Best Performing Section</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    Section {{ section_highlights.best_performing_section }}
+                </div>
+            </div>
+            <div class="insight-card alert-warning" style="margin-bottom: 0;">
+                <div class="insight-title">📉 Lowest Average Section</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    Section {{ section_highlights.lowest_performing_section }}
+                </div>
+            </div>
+            <div class="insight-card alert-success" style="margin-bottom: 0;">
+                <div class="insight-title">🎯 Highest Pass Rate</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    Section {{ section_highlights.highest_pass_rate_section }}
+                </div>
+            </div>
+            <div class="insight-card" style="margin-bottom: 0;">
+                <div class="insight-title">⚖️ Most Consistent (Low Variance)</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    Section {{ section_highlights.most_consistent_section }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Comparison Table -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Section Comparative Benchmark Table</div>
+            </div>
+            <div class="table-responsive">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Section</th>
+                            <th class="text-center">Students</th>
+                            <th class="text-right">Total Marks Sum</th>
+                            <th class="text-right">Average Marks</th>
+                            <th class="text-right">Median Marks</th>
+                            <th class="text-right">Average %</th>
+                            <th class="text-right">Highest %</th>
+                            <th class="text-right">Lowest %</th>
+                            <th class="text-center">Pass / Fail</th>
+                            <th class="text-right">Pass Rate %</th>
+                            <th class="text-right">Std Dev (Consistency)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for _, sec in section_summary_df.iterrows() %}
+                        <tr>
+                            <td><strong>Section {{ sec.section }}</strong></td>
+                            <td class="text-center">{{ sec.students_count }}</td>
+                            <td class="text-right">{{ "{:,.1f}".format(sec.total_marks_sum) }}</td>
+                            <td class="text-right">{{ "{:.2f}".format(sec.average_marks) }}</td>
+                            <td class="text-right">{{ "{:.2f}".format(sec.median_marks) }}</td>
+                            <td class="text-right"><strong style="color: var(--primary);">{{ "{:.2f}".format(sec.average_percentage) }}%</strong></td>
+                            <td class="text-right">{{ "{:.1f}".format(sec.highest_percentage) }}%</td>
+                            <td class="text-right">{{ "{:.1f}".format(sec.lowest_percentage) }}%</td>
+                            <td class="text-center">
+                                <span class="status-pill status-pass">{{ sec.pass_count }}P</span>
+                                <span class="status-pill status-fail">{{ sec.fail_count }}F</span>
+                            </td>
+                            <td class="text-right">
+                                <strong style="color: {% if sec.pass_percentage >= 80 %}#34D399{% elif sec.pass_percentage >= 60 %}#FBBF24{% else %}#F87171{% endif %};">
+                                    {{ "{:.1f}".format(sec.pass_percentage) }}%
+                                </strong>
+                            </td>
+                            <td class="text-right">{{ "{:.2f}".format(sec.std_dev) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Static Publication PNG Charts for Section -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+            <div class="card">
+                <div class="card-header"><div class="card-title">Section Average Performance Chart (Publication-Grade)</div></div>
+                <img src="data:image/png;base64,{{ charts_b64.section_avg }}" alt="Section Average Chart" style="width: 100%; border-radius: var(--radius-md);">
+            </div>
+            <div class="card">
+                <div class="card-header"><div class="card-title">Section Pass Rate Chart (Publication-Grade)</div></div>
+                <img src="data:image/png;base64,{{ charts_b64.section_pass }}" alt="Section Pass Chart" style="width: 100%; border-radius: var(--radius-md);">
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 3: 6-SUBJECT ANALYSIS
+         ========================================================================= -->
+    <div id="tab-subjects" class="tab-content" style="display: none;">
+        <!-- Subject Highlights Cards -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="insight-card alert-success" style="margin-bottom: 0;">
+                <div class="insight-title">🌟 Strongest Subject</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    {{ subject_highlights.strongest_subject }}
+                </div>
+            </div>
+            <div class="insight-card alert-warning" style="margin-bottom: 0;">
+                <div class="insight-title">⚠️ Weakest Subject</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    {{ subject_highlights.weakest_subject }}
+                </div>
+            </div>
+            <div class="insight-card alert-success" style="margin-bottom: 0;">
+                <div class="insight-title">🎯 Highest Pass Rate Subject</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    {{ subject_highlights.highest_pass_rate_subject }}
+                </div>
+            </div>
+            <div class="insight-card alert-danger" style="margin-bottom: 0;">
+                <div class="insight-title">🚨 Lowest Pass Rate Subject</div>
+                <div class="insight-body" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+                    {{ subject_highlights.lowest_pass_rate_subject }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 6 Subject Summary Table -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Subject-Wise Performance Breakdown (6 Subjects)</div>
+            </div>
+            <div class="table-responsive">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Subject Name</th>
+                            <th class="text-center">Valid Students</th>
+                            <th class="text-right">Average Marks</th>
+                            <th class="text-right">Median Marks</th>
+                            <th class="text-right">Highest Mark</th>
+                            <th class="text-right">Lowest Mark</th>
+                            <th class="text-right">Std Dev</th>
+                            <th class="text-center">Passed / Failed</th>
+                            <th class="text-right">Pass Rate %</th>
+                            <th class="text-right">Performance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for _, sub in subject_summary_df.iterrows() %}
+                        <tr>
+                            <td><strong>{{ sub.subject_name }}</strong></td>
+                            <td class="text-center">{{ sub.valid_students }}</td>
+                            <td class="text-right"><strong style="color: var(--primary);">{{ "{:.2f}".format(sub.average_marks) }}</strong></td>
+                            <td class="text-right">{{ "{:.2f}".format(sub.median_marks) }}</td>
+                            <td class="text-right">{{ "{:.1f}".format(sub.maximum_marks) }}</td>
+                            <td class="text-right">{{ "{:.1f}".format(sub.minimum_marks) }}</td>
+                            <td class="text-right">{{ "{:.2f}".format(sub.std_dev) }}</td>
+                            <td class="text-center">
+                                <span class="status-pill status-pass">{{ sub.pass_count }}P</span>
+                                <span class="status-pill status-fail">{{ sub.fail_count }}F</span>
+                            </td>
+                            <td class="text-right">
+                                <strong style="color: {% if sub.pass_percentage >= 85 %}#34D399{% elif sub.pass_percentage >= 70 %}#FBBF24{% else %}#F87171{% endif %};">
+                                    {{ "{:.1f}".format(sub.pass_percentage) }}%
+                                </strong>
+                            </td>
+                            <td class="text-right">{{ "{:.1f}".format(sub.performance_percentage) }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Static Publication PNG Charts for Subjects -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+            <div class="card">
+                <div class="card-header"><div class="card-title">Subject Average Scores (Publication-Grade)</div></div>
+                <img src="data:image/png;base64,{{ charts_b64.subject_avg }}" alt="Subject Average Chart" style="width: 100%; border-radius: var(--radius-md);">
+            </div>
+            <div class="card">
+                <div class="card-header"><div class="card-title">Subject Pass Rate (%) (Publication-Grade)</div></div>
+                <img src="data:image/png;base64,{{ charts_b64.subject_pass }}" alt="Subject Pass Chart" style="width: 100%; border-radius: var(--radius-md);">
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 4: SECTION X SUBJECT MATRIX
+         ========================================================================= -->
+    <div id="tab-matrix" class="tab-content" style="display: none;">
+        <!-- Heatmap Visualization Card -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <div class="card-header">
+                <div class="card-title">Section × Subject Cross-Tabulation Heatmap</div>
+            </div>
+            <div style="text-align: center;">
+                <img src="data:image/png;base64,{{ charts_b64.section_subject_heatmap }}" alt="Section x Subject Heatmap" style="max-width: 900px; width: 100%; border-radius: var(--radius-md);">
+            </div>
+        </div>
+
+        <!-- Matrix Tables -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 1.5rem;">
+            <!-- Average Score Matrix -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Average Marks Matrix (out of 100)</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                {% for col in average_matrix_df.columns %}
+                                <th class="{% if loop.first %}text-left{% else %}text-right{% endif %}">{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for _, row in average_matrix_df.iterrows() %}
+                            <tr>
+                                {% for col in average_matrix_df.columns %}
+                                    {% if loop.first %}
+                                        <td><strong>Section {{ row[col] }}</strong></td>
+                                    {% else %}
+                                        <td class="text-right">
+                                            {% if row[col] is not none %}
+                                                <span style="color: {% if row[col] >= 75 %}#34D399{% elif row[col] < 50 %}#F87171{% else %}var(--text-primary){% endif %}; font-weight: 600;">
+                                                    {{ "{:.1f}".format(row[col]) }}
+                                                </span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pass Rate Matrix -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Subject Pass Rate Matrix (%)</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                {% for col in pass_matrix_df.columns %}
+                                <th class="{% if loop.first %}text-left{% else %}text-right{% endif %}">{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for _, row in pass_matrix_df.iterrows() %}
+                            <tr>
+                                {% for col in pass_matrix_df.columns %}
+                                    {% if loop.first %}
+                                        <td><strong>Section {{ row[col] }}</strong></td>
+                                    {% else %}
+                                        <td class="text-right">
+                                            {% if row[col] is not none %}
+                                                <span style="color: {% if row[col] >= 85 %}#34D399{% elif row[col] < 70 %}#F87171{% else %}var(--text-primary){% endif %}; font-weight: 600;">
+                                                    {{ "{:.1f}".format(row[col]) }}%
+                                                </span>
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 5: STUDENT MASTER ROSTER
+         ========================================================================= -->
+    <div id="tab-roster" class="tab-content" style="display: none;">
+        <!-- Live Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-group" style="flex: 1; min-width: 200px;">
+                <label class="filter-label" for="studentSearchInput">🔍 Search:</label>
+                <input type="text" id="studentSearchInput" class="form-control" style="width: 100%;" placeholder="Search by student name or ID...">
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label" for="sectionFilterSelect">Section:</label>
+                <select id="sectionFilterSelect" class="form-control">
+                    <option value="ALL">All Sections</option>
+                    {% for sec in quality_summary.sections %}
+                    <option value="{{ sec }}">Section {{ sec }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label" for="gradeFilterSelect">Grade:</label>
+                <select id="gradeFilterSelect" class="form-control">
+                    <option value="ALL">All Grades</option>
+                    <option value="A+">A+</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                    <option value="E">E</option>
+                    <option value="F">F</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label class="filter-label" for="statusFilterSelect">Status:</label>
+                <select id="statusFilterSelect" class="form-control">
+                    <option value="ALL">All Status</option>
+                    <option value="Pass">Passed</option>
+                    <option value="Fail">Failed</option>
+                </select>
+            </div>
+
+            <span id="studentVisibleCount" class="badge badge-blue" style="margin-left: auto;">
+                {{ student_df | length }} students shown
+            </span>
+        </div>
+
+        <!-- Master Student Roster Table -->
+        <div class="card">
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <table class="custom-table">
+                    <thead style="position: sticky; top: 0; z-index: 10;">
+                        <tr>
+                            <th class="text-center">Rank</th>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th class="text-center">Section</th>
+                            {% for sk in subject_keys %}
+                            <th class="text-right">{{ display_names.get(sk, sk) }}</th>
+                            {% endfor %}
+                            <th class="text-right">Total Marks</th>
+                            <th class="text-right">Average</th>
+                            <th class="text-right">Percentage</th>
+                            <th class="text-center">Grade</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="studentTableBody">
+                        {% for _, stu in student_df.sort_values(by=['rank', 'percentage'], ascending=[True, False]).iterrows() %}
+                        <tr data-name="{{ stu.student_name | lower }}" data-id="{{ stu.student_id | lower }}" data-section="{{ stu.section }}" data-grade="{{ stu.grade }}" data-status="{{ stu.pass_status }}">
+                            <td class="text-center">
+                                <span class="rank-badge {% if stu.rank == 1 %}rank-1{% elif stu.rank == 2 %}rank-2{% elif stu.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+                                    {{ stu.rank }}
+                                </span>
+                            </td>
+                            <td><code>{{ stu.student_id }}</code></td>
+                            <td><strong>{{ stu.student_name }}</strong></td>
+                            <td class="text-center"><span class="badge badge-blue">{{ stu.section }}</span></td>
+                            
+                            {% for sk in subject_keys %}
+                            <td class="text-right">
+                                {% if stu[sk] is not none and not stu[sk]|string == 'nan' %}
+                                    <span style="color: {% if stu[sk] < 40 %}#F87171{% else %}var(--text-primary){% endif %};">
+                                        {{ "{:.1f}".format(stu[sk]) }}
+                                    </span>
+                                {% else %}
+                                    <span style="color: var(--text-muted);">-</span>
+                                {% endif %}
+                            </td>
+                            {% endfor %}
+
+                            <td class="text-right">{{ "{:.1f}".format(stu.total_marks) }}</td>
+                            <td class="text-right">{{ "{:.2f}".format(stu.average_marks) }}</td>
+                            <td class="text-right"><strong style="color: var(--primary);">{{ "{:.2f}".format(stu.percentage) }}%</strong></td>
+                            <td class="text-center"><strong>{{ stu.grade }}</strong></td>
+                            <td class="text-center">
+                                <span class="status-pill {% if stu.pass_status == 'Pass' %}status-pass{% else %}status-fail{% endif %}">
+                                    {{ stu.pass_status }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 6: TOP 10 HIGH ACHIEVERS
+         ========================================================================= -->
+    <div id="tab-top10" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">🏆 Top 10 High Achievers Honors Board</div>
+            </div>
+            <div class="table-responsive">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Honor Rank</th>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th class="text-center">Section</th>
+                            <th class="text-right">Total Marks</th>
+                            <th class="text-right">Average Marks</th>
+                            <th class="text-right">Overall Percentage</th>
+                            <th class="text-center">Grade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for _, stu in top_10_df.iterrows() %}
+                        <tr style="{% if stu.rank == 1 %}background: rgba(254, 240, 138, 0.08);{% endif %}">
+                            <td class="text-center">
+                                <span class="rank-badge {% if stu.rank == 1 %}rank-1{% elif stu.rank == 2 %}rank-2{% elif stu.rank == 3 %}rank-3{% else %}rank-other{% endif %}">
+                                    #{{ stu.rank }}
+                                </span>
+                            </td>
+                            <td><code>{{ stu.student_id }}</code></td>
+                            <td><strong style="font-size: 1rem;">{{ stu.student_name }}</strong></td>
+                            <td class="text-center"><span class="badge badge-blue">Section {{ stu.section }}</span></td>
+                            <td class="text-right">{{ "{:.1f}".format(stu.total_marks) }}</td>
+                            <td class="text-right">{{ "{:.2f}".format(stu.average_marks) }}</td>
+                            <td class="text-right"><strong style="color: #34D399; font-size: 1.05rem;">{{ "{:.2f}".format(stu.percentage) }}%</strong></td>
+                            <td class="text-center"><span class="status-pill status-pass">{{ stu.grade }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 7: AT-RISK ACADEMIC SUPPORT ROSTER
+         ========================================================================= -->
+    <div id="tab-atrisk" class="tab-content" style="display: none;">
+        <div class="insight-card alert-danger" style="margin-bottom: 1.5rem;">
+            <div class="insight-title">⚠️ Priority Academic Intervention Required</div>
+            <div class="insight-body">
+                The following <strong>{{ at_risk_df | length }}</strong> students have failed one or more individual subjects or scored below the 50.0% overall performance benchmark. Targeted tutoring and remedial study plans are strongly recommended.
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Cohort Rank</th>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th class="text-center">Section</th>
+                            <th class="text-right">Total Marks</th>
+                            <th class="text-right">Percentage</th>
+                            <th class="text-center">Failed Subjects Count</th>
+                            <th class="text-center">Grade</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if at_risk_df.empty %}
+                        <tr>
+                            <td colspan="9" class="text-center" style="padding: 2rem; color: #34D399;">
+                                🎉 Excellent news! No students meet the at-risk criteria in this cohort.
+                            </td>
+                        </tr>
+                        {% else %}
+                            {% for _, stu in at_risk_df.iterrows() %}
+                            <tr>
+                                <td class="text-center">#{{ stu.rank }}</td>
+                                <td><code>{{ stu.student_id }}</code></td>
+                                <td><strong>{{ stu.student_name }}</strong></td>
+                                <td class="text-center"><span class="badge badge-blue">Section {{ stu.section }}</span></td>
+                                <td class="text-right">{{ "{:.1f}".format(stu.total_marks) }}</td>
+                                <td class="text-right"><strong style="color: #F87171;">{{ "{:.2f}".format(stu.percentage) }}%</strong></td>
+                                <td class="text-center"><span class="status-pill status-fail">{{ stu.failed_subjects_count }} Subject(s)</span></td>
+                                <td class="text-center"><strong>{{ stu.grade }}</strong></td>
+                                <td class="text-center"><span class="status-pill status-fail">{{ stu.pass_status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 8: AUTOMATED INSIGHTS & RECOMMENDATIONS
+         ========================================================================= -->
+    <div id="tab-insights" class="tab-content" style="display: none;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap: 1.5rem;">
+            <!-- Executive Summary Points -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📌 Executive Performance Overview</div>
+                </div>
+                {% for item in insights.executive_summary %}
+                <div class="insight-card" style="margin-bottom: 0.75rem;">
+                    <div class="insight-body">• {{ item }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Section Benchmarks -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🏫 Section Benchmarking Insights</div>
+                </div>
+                {% for item in insights.section_insights %}
+                <div class="insight-card alert-success" style="margin-bottom: 0.75rem;">
+                    <div class="insight-body">• {{ item }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Subject Trends -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📚 Subject Performance Observations</div>
+                </div>
+                {% for item in insights.subject_insights %}
+                <div class="insight-card alert-warning" style="margin-bottom: 0.75rem;">
+                    <div class="insight-body">• {{ item }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Strategic Actionable Recommendations -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🎯 Strategic Academic Recommendations</div>
+                </div>
+                {% for item in insights.recommendations %}
+                <div class="insight-card" style="border-left-color: var(--purple); margin-bottom: 0.75rem;">
+                    <div class="insight-body">✨ {{ item }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 9: DATA QUALITY AUDIT
+         ========================================================================= -->
+    <div id="tab-quality" class="tab-content" style="display: none;">
+        <!-- Data Health Metrics -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="kpi-card">
+                <div class="kpi-label">Health Score</div>
+                <div class="kpi-value">{{ quality_summary.quality_score }}/100</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Duplicates Purged</div>
+                <div class="kpi-value">{{ quality_summary.duplicate_rows + quality_summary.duplicate_ids }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Missing Mark Entries</div>
+                <div class="kpi-value">{{ quality_summary.missing_marks_count }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Invalid/Out-of-Range</div>
+                <div class="kpi-value">{{ quality_summary.invalid_marks_count + quality_summary.out_of_range_count }}</div>
+            </div>
+        </div>
+
+        <!-- Issue Logs Table -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Detected Quality Issues & Validation Log</div>
+            </div>
+            <div class="table-responsive">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th class="text-center">Subject</th>
+                            <th class="text-center">Raw Input Value</th>
+                            <th>Validation Action & Explanation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not quality_summary.anomalous_cells %}
+                        <tr>
+                            <td colspan="5" class="text-center" style="padding: 2rem; color: #34D399;">
+                                ✨ 100% Clean! No anomalous, missing, or corrupted data entries found.
+                            </td>
+                        </tr>
+                        {% else %}
+                            {% for item in quality_summary.anomalous_cells %}
+                            <tr>
+                                <td><code>{{ item.student_id }}</code></td>
+                                <td>{{ item.student_name }}</td>
+                                <td class="text-center"><span class="badge badge-purple">{{ item.subject }}</span></td>
+                                <td class="text-center"><span class="badge badge-red">{{ item.raw_value }}</span></td>
+                                <td>{{ item.reason }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
