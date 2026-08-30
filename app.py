@@ -508,4 +508,22 @@ else:
 
 st.subheader("📊 Subject-wise Marks")
 
-st.bar_chart(df[subjects].mean())
+# Subject-wise Marks
+st.subheader("📊 Subject-wise Marks")
+
+subjects = [
+    "Mathematics",
+    "Science",
+    "English",
+    "Hindi",
+    "Social Science",
+    "Computer"
+]
+
+subject_cols = [col for col in subjects if col in df.columns]
+
+if len(subject_cols) > 0:
+    subject_average = df[subject_cols].mean()
+    st.bar_chart(subject_average)
+else:
+    st.warning("No subject columns found in the uploaded CSV file.")
