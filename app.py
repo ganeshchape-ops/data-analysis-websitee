@@ -508,22 +508,28 @@ else:
 
 st.subheader("📊 Subject-wise Marks")
 
-# Subject-wise Marks
-st.subheader("📊 Subject-wise Marks")
+file = st.file_uploader("Upload CSV File", type=["csv"])
 
-subjects = [
-    "Mathematics",
-    "Science",
-    "English",
-    "Hindi",
-    "Social Science",
-    "Computer"
-]
+if file is not None:
+    df = pd.read_csv(file)
 
-subject_cols = [col for col in subjects if col in df.columns]
+    st.subheader("📊 Subject-wise Marks")
 
-if len(subject_cols) > 0:
-    subject_average = df[subject_cols].mean()
-    st.bar_chart(subject_average)
+    subjects = [
+        "Mathematics",
+        "Science",
+        "English",
+        "Hindi",
+        "Social Science",
+        "Computer"
+    ]
+
+    subject_cols = [col for col in subjects if col in df.columns]
+
+    if subject_cols:
+        subject_average = df[subject_cols].mean()
+        st.bar_chart(subject_average)
+    else:
+        st.warning("Subject columns not found in CSV.")
 else:
-    st.warning("No subject columns found in the uploaded CSV file.")
+    st.info("👆 Please upload a CSV file to start analysis.")
